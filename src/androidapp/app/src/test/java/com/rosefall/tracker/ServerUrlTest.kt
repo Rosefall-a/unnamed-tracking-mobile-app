@@ -1,0 +1,34 @@
+package com.rosefall.tracker
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
+import org.junit.Test
+
+class ServerUrlTest {
+    @Test fun addsHttpsWhenSchemeIsMissing() {
+        assertEquals("https://tracker.example.com", ServerUrl.normalize(" tracker.example.com/ "))
+    }
+
+    @Test fun rejectsPlainHttp() {
+        assertThrows(IllegalArgumentException::class.java) { ServerUrl.normalize("http://192.168.1.20:5173/") }
+    }
+
+    @Test fun defaultsPrivateLanAddressToHttps() {
+        assertEquals("https://192.168.1.20:5173", ServerUrl.normalize("192.168.1.20:5173"))
+        assertEquals("https://10.0.2.2:5173", ServerUrl.normalize("10.0.2.2:5173"))
+    }
+
+    @Test fun defaultsPublicHostnameToHttps() {
+        assertEquals("https://tracker.example.com", ServerUrl.normalize("tracker.example.com"))
+    }
+
+    @Test fun rejectsNonWebSchemesAndCredentials() {
+        assertThrows(IllegalArgumentException::class.java) { ServerUrl.normalize("file:///tmp/app") }
+        assertThrows(IllegalArgumentException::class.java) { ServerUrl.normalize("https://user:pass@example.com") }
+    }
+
+    @Test fun rejectsQueryAndFragment() {
+        assertThrows(IllegalArgumentException::class.java) { ServerUrl.normalize("https://example.com/?x=1") }
+        assertThrows(IllegalArgumentException::class.java) { ServerUrl.normalize("https://example.com/#login") }
+    }
+}

@@ -1,0 +1,21 @@
+<Window x:Class="Tracking.Windows.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <NavigationView x:Name="Navigation" IsBackButtonVisible="Collapsed" PaneDisplayMode="LeftCompact" SelectionChanged="Navigation_SelectionChanged">
+      <NavigationView.MenuItems>
+        <NavigationViewItem Content="Home" Tag="/" Icon="Home"/><NavigationViewItem Content="Games" Tag="/games" Icon="Play"/>
+        <NavigationViewItem Content="Sets" Tag="/sets" Icon="Library"/><NavigationViewItem Content="Profile" Tag="/profile" Icon="Contact"/>
+      </NavigationView.MenuItems>
+      <NavigationView.FooterMenuItems><NavigationViewItem Content="Change server" Tag="change-server" Icon="Globe"/></NavigationView.FooterMenuItems>
+      <Grid>
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <CommandBar DefaultLabelPosition="Right"><AppBarButton Icon="Refresh" Label="Refresh" Click="Refresh_Click"/><AppBarButton Icon="OpenInNewWindow" Label="Open in browser" Click="OpenBrowser_Click"/><AppBarButton Icon="Globe" Label="Server" Click="ChangeServer_Click"/></CommandBar>
+        <WebView2 x:Name="Browser" Grid.Row="1" Visibility="Collapsed" NavigationCompleted="Browser_NavigationCompleted"/>
+        <Grid x:Name="SetupPanel" Grid.RowSpan="2">
+          <Border Width="540" Padding="36" CornerRadius="24" HorizontalAlignment="Center" VerticalAlignment="Center" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+            <StackPanel Spacing="14"><FontIcon Glyph="&#xE774;" FontSize="34" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/><TextBlock Text="Connect your library" Style="{ThemeResource TitleTextBlockStyle}"/><TextBlock TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Enter the HTTPS address of your tracking server. HTTPS is required so sign-in credentials are encrypted in transit."/><TextBox x:Name="ServerInput" Header="Server address" PlaceholderText="https://tracker.example.com"/><InfoBar x:Name="StatusBar" IsOpen="False" IsClosable="False" Severity="Error"/><Button Content="Connect" HorizontalAlignment="Stretch" Style="{ThemeResource AccentButtonStyle}" Click="Connect_Click"/></StackPanel>
+          </Border>
+        </Grid>
+      </Grid>
+    </NavigationView>
+  </Grid>
+</Window>
