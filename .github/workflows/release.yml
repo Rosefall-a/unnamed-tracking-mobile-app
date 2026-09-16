@@ -1,0 +1,45 @@
+name: Release clients
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.10.2'}
+      - run: gradle -p src/androidapp assembleRelease --no-daemon
+      - uses: actions/upload-artifact@v4
+        with: {name: android-clients, path: 'src/androidapp/**/build/outputs/apk/release/*.apk'}
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: {dotnet-version: '8.0.x'}
+      - run: dotnet test src/windowsapp/Tracking.Windows.Tests/Tracking.Windows.Tests.csproj -c Release
+      - run: dotnet publish src/windowsapp/Tracking.Windows/Tracking.Windows.csproj -c Release -r win-x64 --self-contained true -p:Platform=x64 -o artifacts/windows
+      - shell: pwsh
+        run: Compress-Archive artifacts/windows/* artifacts/Unnamed-Tracking-Windows-win-x64.zip
+      - uses: actions/upload-artifact@v4
+        with: {name: windows-client, path: artifacts/Unnamed-Tracking-Windows-win-x64.zip}
+  publish:
+    needs: [android, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: {path: artifacts}
+      - run: zip -r artifacts/Unnamed-Tracking-PWA.zip pwa
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            artifacts/android-clients/**/*.apk
+            artifacts/windows-client/*.zip
+            artifacts/Unnamed-Tracking-PWA.zip

@@ -1,0 +1,11 @@
+.gradle/
+.idea/
+**/bin/
+**/obj/
+**/build/
+*.user
+*.apk
+*.aab
+*.msix
+*.msixbundle
+artifacts/
