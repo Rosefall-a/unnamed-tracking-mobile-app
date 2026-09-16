@@ -123,7 +123,11 @@ class MainActivity : ComponentActivity() {
         browser.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val uri = request.url
-                if (uri.scheme == "https") return false\n                if (uri.scheme == "http") {\n                    showServerSetup(serverUrl, "An insecure HTTP redirect was blocked. HTTPS is required.")\n                    return true\n                }
+                if (uri.scheme == "https") return false
+                if (uri.scheme == "http") {
+                    showServerSetup(serverUrl, "An insecure HTTP redirect was blocked. HTTPS is required.")
+                    return true
+                }
                 runCatching { startActivity(Intent(Intent.ACTION_VIEW, uri)) }
                 return true
             }
