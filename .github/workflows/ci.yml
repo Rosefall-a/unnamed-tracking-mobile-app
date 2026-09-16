@@ -21,15 +21,29 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with: {dotnet-version: '8.0.x'}
-      - run: dotnet test src/windowsapp/Tracking.Windows.Tests/Tracking.Windows.Tests.csproj --configuration Release
-      - run: dotnet build src/windowsapp/Tracking.Windows/Tracking.Windows.csproj --configuration Release -p:Platform=x64
+      - name: Test Windows core
+        run: dotnet test src/windowsapp/Tracking.Windows.Tests/Tracking.Windows.Tests.csproj --configuration Release
+      - name: Build Windows x64
+        run: dotnet build src/windowsapp/Tracking.Windows/Tracking.Windows.csproj --configuration Release -p:Platform=x64
+      - name: Publish self-contained Windows x64
+        run: dotnet publish src/windowsapp/Tracking.Windows/Tracking.Windows.csproj --configuration Release --runtime win-x64 --self-contained true -p:Platform=x64 -p:WindowsAppSDKSelfContained=true -o artifacts/windows
+      - name: Verify Windows publish
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'artifacts/windows/Tracking.Windows.exe')) { throw 'Windows executable was not produced.' }
+          $runtimeFiles = @(Get-ChildItem 'artifacts/windows' -Recurse -File -Filter 'Microsoft.WindowsAppRuntime*' -ErrorAction SilentlyContinue)
+          if ($runtimeFiles.Count -eq 0) { throw 'Windows App SDK self-contained runtime was not included.' }
   security:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Assert secure client transport
         run: |
-          ! rg 'usesCleartextTraffic="true"' src/androidapp --glob 'AndroidManifest.xml'\n          test "$(rg -l 'require\\(uri.scheme == "https"\\)' src/androidapp --glob 'ServerUrl.kt' | wc -l)" -eq 2\n          rg 'uri.scheme == "http"' src/androidapp/webapp/src/main/java/com/rosefall/tracker/webapp/MainActivity.kt\n          ! rg 'isPasswordAutosaveEnabled = true' src
-          ! rg 'println\(.*password|Log\..*password|Message.*password' src
+          ! grep -R -n --include='AndroidManifest.xml' 'usesCleartextTraffic="true"' src/androidapp
+          test "$(grep -R -l --include='ServerUrl.kt' 'require(uri.scheme == "https")' src/androidapp | wc -l)" -eq 2
+          grep -R -n 'uri.scheme == "http"' src/androidapp/webapp/src/main/java/com/rosefall/tracker/webapp/MainActivity.kt
+          ! grep -R -n -E 'isPasswordAutosaveEnabled = true' src
+          ! grep -R -n -E 'println\(.*password|Log\..*password|Message.*password' src
+          grep -n '<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>' src/windowsapp/Tracking.Windows/Tracking.Windows.csproj
       - name: Validate PWA JSON
         run: jq empty pwa/manifest.webmanifest

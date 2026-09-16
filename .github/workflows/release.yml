@@ -25,7 +25,14 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with: {dotnet-version: '8.0.x'}
       - run: dotnet test src/windowsapp/Tracking.Windows.Tests/Tracking.Windows.Tests.csproj -c Release
-      - run: dotnet publish src/windowsapp/Tracking.Windows/Tracking.Windows.csproj -c Release -r win-x64 --self-contained true -p:Platform=x64 -o artifacts/windows
+      - name: Publish self-contained Windows x64
+        run: dotnet publish src/windowsapp/Tracking.Windows/Tracking.Windows.csproj -c Release -r win-x64 --self-contained true -p:Platform=x64 -p:WindowsAppSDKSelfContained=true -o artifacts/windows
+      - name: Verify Windows publish
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'artifacts/windows/Tracking.Windows.exe')) { throw 'Windows executable was not produced.' }
+          $runtimeFiles = @(Get-ChildItem 'artifacts/windows' -Recurse -File -Filter 'Microsoft.WindowsAppRuntime*' -ErrorAction SilentlyContinue)
+          if ($runtimeFiles.Count -eq 0) { throw 'Windows App SDK self-contained runtime was not included.' }
       - shell: pwsh
         run: Compress-Archive artifacts/windows/* artifacts/Unnamed-Tracking-Windows-win-x64.zip
       - uses: actions/upload-artifact@v4
