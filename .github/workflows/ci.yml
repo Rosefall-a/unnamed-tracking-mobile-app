@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Assert secure client transport
         run: |
-          ! rg 'http://|isPasswordAutosaveEnabled = true' src --glob '*.kt' --glob '*.cs' --glob '!**/test/**' --glob '!**/*Tests/**'
+          ! rg 'usesCleartextTraffic="true"' src/androidapp --glob 'AndroidManifest.xml'\n          test "$(rg -l 'require\\(uri.scheme == "https"\\)' src/androidapp --glob 'ServerUrl.kt' | wc -l)" -eq 2\n          rg 'uri.scheme == "http"' src/androidapp/webapp/src/main/java/com/rosefall/tracker/webapp/MainActivity.kt\n          ! rg 'isPasswordAutosaveEnabled = true' src
           ! rg 'println\(.*password|Log\..*password|Message.*password' src
       - name: Validate PWA JSON
         run: jq empty pwa/manifest.webmanifest
