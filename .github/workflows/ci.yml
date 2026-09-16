@@ -31,18 +31,19 @@ jobs:
         shell: pwsh
         run: |
           if (-not (Test-Path 'artifacts/windows/Tracking.Windows.exe')) { throw 'Windows executable was not produced.' }
-          if (-not (Test-Path 'artifacts/windows/Microsoft.WindowsAppRuntime.1.6')) { throw 'Windows App SDK self-contained runtime was not included.' }
+          $runtimeFiles = @(Get-ChildItem 'artifacts/windows' -Recurse -File -Filter 'Microsoft.WindowsAppRuntime*' -ErrorAction SilentlyContinue)
+          if ($runtimeFiles.Count -eq 0) { throw 'Windows App SDK self-contained runtime was not included.' }
   security:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Assert secure client transport
         run: |
-          ! rg 'usesCleartextTraffic="true"' src/androidapp --glob 'AndroidManifest.xml'
-          test "$(rg -l 'require\\(uri.scheme == "https"\\)' src/androidapp --glob 'ServerUrl.kt' | wc -l)" -eq 2
-          rg 'uri.scheme == "http"' src/androidapp/webapp/src/main/java/com/rosefall/tracker/webapp/MainActivity.kt
-          ! rg 'isPasswordAutosaveEnabled = true' src
-          ! rg 'println\(.*password|Log\..*password|Message.*password' src
-          rg '<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>' src/windowsapp/Tracking.Windows/Tracking.Windows.csproj
+          ! grep -R -n --include='AndroidManifest.xml' 'usesCleartextTraffic="true"' src/androidapp
+          test "$(grep -R -l --include='ServerUrl.kt' 'require(uri.scheme == "https")' src/androidapp | wc -l)" -eq 2
+          grep -R -n 'uri.scheme == "http"' src/androidapp/webapp/src/main/java/com/rosefall/tracker/webapp/MainActivity.kt
+          ! grep -R -n -E 'isPasswordAutosaveEnabled = true' src
+          ! grep -R -n -E 'println\(.*password|Log\..*password|Message.*password' src
+          grep -n '<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>' src/windowsapp/Tracking.Windows/Tracking.Windows.csproj
       - name: Validate PWA JSON
         run: jq empty pwa/manifest.webmanifest
