@@ -79,7 +79,7 @@ class MainActivity : ComponentActivity() {
             setTextColor(Color.WHITE)
         })
         card.addView(TextView(this).apply {
-            text = "Use HTTP for a trusted local server or HTTPS for a secured deployment."
+            text = "Use the HTTPS address of your secured tracking deployment."
             textSize = 16f
             setTextColor(Color.rgb(190, 192, 204))
             setPadding(0, (12 * density).toInt(), 0, (18 * density).toInt())
@@ -123,7 +123,7 @@ class MainActivity : ComponentActivity() {
         browser.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val uri = request.url
-                if (uri.scheme == "http" || uri.scheme == "https") return false
+                if (uri.scheme == "https") return false\n                if (uri.scheme == "http") {\n                    showServerSetup(serverUrl, "An insecure HTTP redirect was blocked. HTTPS is required.")\n                    return true\n                }
                 runCatching { startActivity(Intent(Intent.ACTION_VIEW, uri)) }
                 return true
             }
