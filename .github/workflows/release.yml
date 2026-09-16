@@ -31,7 +31,8 @@ jobs:
         shell: pwsh
         run: |
           if (-not (Test-Path 'artifacts/windows/Tracking.Windows.exe')) { throw 'Windows executable was not produced.' }
-          if (-not (Test-Path 'artifacts/windows/Microsoft.WindowsAppRuntime.1.6')) { throw 'Windows App SDK self-contained runtime was not included.' }
+          $runtimeFiles = @(Get-ChildItem 'artifacts/windows' -Recurse -File -Filter 'Microsoft.WindowsAppRuntime*' -ErrorAction SilentlyContinue)
+          if ($runtimeFiles.Count -eq 0) { throw 'Windows App SDK self-contained runtime was not included.' }
       - shell: pwsh
         run: Compress-Archive artifacts/windows/* artifacts/Unnamed-Tracking-Windows-win-x64.zip
       - uses: actions/upload-artifact@v4
