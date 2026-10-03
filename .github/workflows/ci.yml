@@ -47,3 +47,7 @@ jobs:
           grep -n '<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>' src/windowsapp/Tracking.Windows/Tracking.Windows.csproj
       - name: Validate PWA JSON
         run: jq empty pwa/manifest.webmanifest
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verify PWA lifecycle and cache safety
+        run: node --test pwa/tests/service-worker.test.mjs
