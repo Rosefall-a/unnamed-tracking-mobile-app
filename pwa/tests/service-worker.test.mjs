@@ -4,7 +4,7 @@ import vm from "node:vm";
 import test from "node:test";
 
 const source = await readFile(new URL("../service-worker.js", import.meta.url), "utf8");
-function worker({ enabled = true, failStorage = false, failNetwork = false } = {}) {
+function worker({ enabled = true, failStorage = false, failNetwork = false, statusEnabled = true, beforePut } = {}) {
   const listeners = new Map(), stored = new Map([["unrelated", new Map()], ["tracking-shell-v1", new Map()], ["unnamed-tracking:pwa:old", new Map()]]);
   const calls = [];
   let unregistered = false;
@@ -13,16 +13,20 @@ function worker({ enabled = true, failStorage = false, failNetwork = false } = {
     skipWaiting: async () => {}, clients: { claim: async () => {} },
     registration: { unregister: async () => { unregistered = true; }, update: async () => {} } };
   const caches = { keys: async () => [...stored.keys()], delete: async key => stored.delete(key),
+    match: async (url, { cacheName }) => {
+      if (failStorage) throw new Error("storage denied");
+      return stored.get(cacheName)?.get(url);
+    },
     open: async key => {
       if (failStorage) throw new Error("storage denied");
       if (!stored.has(key)) stored.set(key, new Map());
-      return { put: async (url, response) => stored.get(key).set(url, response), match: async url => stored.get(key).get(url) };
+      return { put: async (url, response) => { if (beforePut) await beforePut(); stored.get(key).set(url, response); }, match: async url => stored.get(key).get(url) };
     } };
   const fetch = async request => {
     const url = typeof request === "string" ? request : request.url;
     calls.push(url);
     if (failNetwork) throw new Error("offline");
-    if (url === "/pwa/status") return Response.json({ enabled: true, generation: "new" });
+    if (url === "/pwa/status") return Response.json({ enabled: statusEnabled, generation: "new" });
     return new Response(url === "/pwa/offline.html" ? "Waiting for internet" : "private online document", { headers: { "Content-Type": "text/html" } });
   };
   vm.runInNewContext(source, { PWA: { enabled, generation: "new" }, self, caches, fetch, URL, Response });
@@ -103,4 +107,39 @@ test("public install metadata and icons remain 0.0.x with full-root launch", asy
     assert.equal(bytes.readUInt32BE(16), size);
     assert.equal(bytes.readUInt32BE(20), size);
   }
+});
+
+test("retirement waits for in-flight precache and acknowledges complete cleanup", async () => {
+  let releasePut, beganPut;
+  const blocked = new Promise(resolve => { releasePut = resolve; });
+  const started = new Promise(resolve => { beganPut = resolve; });
+  const w = worker({ beforePut: async () => { beganPut(); await blocked; } });
+  const install = w.emit("install");
+  await started;
+  let acknowledged = false;
+  const retirement = w.emit("message", { data: { type: "tracking-pwa-retire" },
+    ports: [{ postMessage: value => { acknowledged = value.type === "tracking-pwa-retired"; } }] });
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(w.unregistered(), false);
+  releasePut();
+  await Promise.all([install, retirement]);
+  await w.emit("activate");
+  assert.ok(w.unregistered());
+  assert.ok(acknowledged);
+  assert.deepEqual([...w.stored.keys()], ["unrelated"]);
+});
+
+test("offline fallback never recreates a missing or retired cache", async () => {
+  const w = worker({ failNetwork: true });
+  const response = await w.emit("fetch", { request: { url: "https://tracking.test/", method: "GET", mode: "navigate" } });
+  assert.equal(response.status, 503);
+  assert.equal(w.stored.has("unnamed-tracking:pwa:new"), false);
+});
+
+test("stale enabled worker retires if provider was disabled during installation", async () => {
+  const w = worker({ statusEnabled: false });
+  await w.emit("install");
+  await w.emit("activate");
+  assert.ok(w.unregistered());
+  assert.deepEqual([...w.stored.keys()], ["unrelated"]);
 });
