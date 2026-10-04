@@ -1,7 +1,7 @@
 # PWA assets
 
 These existing assets are the foundation of the maintained `official.pwa` plugin.
-PWA integration version is recorded in `version.json` and remains **0.0.1**;
+PWA integration version is recorded in `version.json` and remains **0.0.2**;
 native Android, Android WebView and Windows/WinUI versions are independent.
 
 The host owns `/service-worker.js`, `/manifest.webmanifest`, and public `/pwa/`
@@ -19,6 +19,15 @@ requests pass through. No runtime response is written to CacheStorage. Offline
 content has no time expiry. Version changes replace the owned cache; removal or
 disablement is observed on the next online contact, leaving other caches intact.
 
+The offline page follows Light, Dark or System and the device's last selected
+Orange, Green or custom palette. The `ui-appearance` localStorage record contains
+only a version, mode, palette ID, public hex color roles and a contrast flag.
+It contains no account identifier, credentials, widgets or API data. Invalid or
+unavailable storage falls back to the default palette and system mode. Browser
+theme-color bars follow the page background; install metadata remains public
+and does not contain personal settings. Account preferences take precedence
+when the complete application reconnects.
+
 From the plugin repository run `python tools/sync_pwa.py --mobile-root PATH
 --host-root PATH` and repeat with `--check` to verify source hashes/version and
 host infrastructure. Increment the explicit `0.0.x` patch in both source and
@@ -27,5 +36,5 @@ Official releases require separately provisioned protected signing keys; unsigne
 previews are visibly unverified. The PWA ZIP in the existing mobile release
 workflow remains a source asset bundle, not another native client.
 
-Run `node --test pwa/tests/service-worker.test.mjs`. Real host/plugin lifecycle
+Run `node --test pwa/tests/*.test.mjs`. Real host/plugin lifecycle
 and browser acceptance lives in `unnamed_tracking_app/tools/check_pwa_lifecycle.py`.
