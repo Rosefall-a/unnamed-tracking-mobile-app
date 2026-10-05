@@ -1,7 +1,7 @@
 # PWA assets
 
 These existing assets are the foundation of the maintained `official.pwa` plugin.
-PWA integration version is recorded in `version.json` and remains **0.0.2**;
+PWA integration version is recorded in `version.json` and remains **0.0.3**;
 native Android, Android WebView and Windows/WinUI versions are independent.
 
 The host owns `/service-worker.js`, `/manifest.webmanifest`, and public `/pwa/`
@@ -14,8 +14,10 @@ Without that metadata it fails safely by retiring its own registration.
 
 The PWA exposes the complete existing application, with its normal sessions and
 login/SSO. It stores no passwords or private offline data. Only a neutral waiting
-for internet HTML page is cached; `/api/`, authentication and non-navigation
-requests pass through. No runtime response is written to CacheStorage. Offline
+for internet HTML page and up to 32 immutable public theme assets are cached.
+The asset exception accepts only digest-addressed CSS, images and fonts under
+`/api/themes/assets/`; it rejects HTML, query strings and document navigations.
+Private APIs, authentication and other non-navigation requests pass through. Offline
 content has no time expiry. Version changes replace the owned cache; removal or
 disablement is observed on the next online contact, leaving other caches intact.
 
@@ -26,7 +28,11 @@ It contains no account identifier, credentials, widgets or API data. Invalid or
 unavailable storage falls back to the default palette and system mode. Browser
 theme-color bars follow the page background; install metadata remains public
 and does not contain personal settings. Account preferences take precedence
-when the complete application reconnects.
+when the complete application reconnects, unless this browser explicitly selects
+device appearance. The selected public theme ID and digest-addressed stylesheet
+URL are cosmetic localStorage entries, allowing the neutral offline page to use
+an installed theme. They contain no account data. Removal retires the worker and
+clears its owned HTML and theme caches, including in-flight asset writes.
 
 From the plugin repository run `python tools/sync_pwa.py --mobile-root PATH
 --host-root PATH` and repeat with `--check` to verify source hashes/version and

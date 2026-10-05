@@ -4,7 +4,7 @@ import vm from "node:vm";
 import test from "node:test";
 
 const source = await readFile(new URL("../service-worker.js", import.meta.url), "utf8");
-function worker({ enabled = true, failStorage = false, failNetwork = false, statusEnabled = true, beforePut } = {}) {
+function worker({ enabled = true, failStorage = false, failNetwork = false, statusEnabled = true, beforePut, assetType = "text/css" } = {}) {
   const listeners = new Map(), stored = new Map([["unrelated", new Map()], ["tracking-shell-v1", new Map()], ["unnamed-tracking:pwa:old", new Map()]]);
   const calls = [];
   let unregistered = false;
@@ -20,13 +20,15 @@ function worker({ enabled = true, failStorage = false, failNetwork = false, stat
     open: async key => {
       if (failStorage) throw new Error("storage denied");
       if (!stored.has(key)) stored.set(key, new Map());
-      return { put: async (url, response) => { if (beforePut) await beforePut(); stored.get(key).set(url, response); }, match: async url => stored.get(key).get(url) };
+      return { put: async (url, response) => { if (beforePut) await beforePut(url); stored.get(key).set(url, response); }, match: async url => stored.get(key).get(url),
+        keys: async () => [...stored.get(key).keys()].map(url => ({ url: new URL(url, self.location.origin).href })), delete: async request => stored.get(key).delete(request.url) };
     } };
   const fetch = async request => {
     const url = typeof request === "string" ? request : request.url;
     calls.push(url);
     if (failNetwork) throw new Error("offline");
     if (url === "/pwa/status") return Response.json({ enabled: statusEnabled, generation: "new" });
+    if (url.includes("/api/themes/assets/")) return new Response("public CSS", { headers: { "Content-Type": assetType, "Cache-Control": "public, max-age=31536000, immutable" } });
     return new Response(url === "/pwa/offline.html" ? "Waiting for internet" : "private online document", { headers: { "Content-Type": "text/html" } });
   };
   vm.runInNewContext(source, { PWA: { enabled, generation: "new" }, self, caches, fetch, URL, Response });
@@ -37,7 +39,7 @@ function worker({ enabled = true, failStorage = false, failNetwork = false, stat
     await Promise.all(work);
     return response ? await response : undefined;
   }
-  return { stored, calls, emit, unregistered: () => unregistered };
+  return { stored, calls, emit, unregistered: () => unregistered, offline: () => { failNetwork = true; } };
 }
 
 test("activation migrates only owned caches; only neutral offline HTML is cached", async () => {
@@ -141,5 +143,51 @@ test("stale enabled worker retires if provider was disabled during installation"
   await w.emit("install");
   await w.emit("activate");
   assert.ok(w.unregistered());
+  assert.deepEqual([...w.stored.keys()], ["unrelated"]);
+});
+
+test("only immutable public theme assets are cached and available offline", async () => {
+  const w = worker();
+  await w.emit("install");
+  const url = `https://tracking.test/api/themes/assets/official.forest/${"a".repeat(64)}/theme.css`;
+  const request = { url, method: "GET", mode: "cors" };
+  assert.equal(await (await w.emit("fetch", { request })).text(), "public CSS");
+  w.offline();
+  assert.equal(await (await w.emit("fetch", { request })).text(), "public CSS");
+  assert.equal(await w.emit("fetch", { request: { ...request, url: "https://tracking.test/api/themes" } }), undefined);
+  assert.equal(await w.emit("fetch", { request: { ...request, url: url + "?account=private" } }), undefined);
+  assert.equal(await w.emit("fetch", { request: { ...request, mode: "navigate" } }), undefined);
+  const invalid = worker({ assetType: "text/html" });
+  await invalid.emit("install");
+  await invalid.emit("fetch", { request });
+  assert.deepEqual([...invalid.stored.get("unnamed-tracking:pwa:new").keys()], ["/pwa/offline.html"]);
+});
+
+test("theme cache is bounded and explicit retirement removes every cosmetic asset", async () => {
+  const w = worker();
+  await w.emit("install");
+  for (let index = 0; index < 35; index++) await w.emit("fetch", { request: {
+    url: `https://tracking.test/api/themes/assets/official.forest/${"a".repeat(64)}/${index}.css`, method: "GET", mode: "cors",
+  } });
+  assert.equal(w.stored.get("unnamed-tracking:pwa:new").size, 33);
+  assert.ok(w.stored.get("unnamed-tracking:pwa:new").has("/pwa/offline.html"));
+  await w.emit("message", { data: { type: "tracking-pwa-retire" } });
+  assert.deepEqual([...w.stored.keys()], ["unrelated"]);
+});
+
+test("retirement also waits for an in-flight public theme cache write", async () => {
+  let beganPut, releasePut;
+  const started = new Promise(resolve => { beganPut = resolve; });
+  const blocked = new Promise(resolve => { releasePut = resolve; });
+  const w = worker({ beforePut: async url => { if (url.includes("/api/themes/assets/")) { beganPut(); await blocked; } } });
+  await w.emit("install");
+  const asset = w.emit("fetch", { request: { url: `https://tracking.test/api/themes/assets/official.forest/${"a".repeat(64)}/theme.css`, method: "GET", mode: "cors" } });
+  await started;
+  const retirement = w.emit("message", { data: { type: "tracking-pwa-retire" } });
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(w.unregistered(), false);
+  releasePut();
+  await Promise.all([asset, retirement]);
+  assert.equal(w.unregistered(), true);
   assert.deepEqual([...w.stored.keys()], ["unrelated"]);
 });
