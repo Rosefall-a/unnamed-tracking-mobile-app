@@ -50,4 +50,4 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: '22'}
       - name: Verify PWA lifecycle and cache safety
-        run: node --test pwa/tests/service-worker.test.mjs
+        run: node --test pwa/tests/*.test.mjs
