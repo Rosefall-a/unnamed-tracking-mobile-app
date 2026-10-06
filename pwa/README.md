@@ -1,7 +1,7 @@
 # PWA assets
 
 These existing assets are the foundation of the maintained `official.pwa` plugin.
-PWA integration version is recorded in `version.json` and remains **0.0.3**;
+PWA integration version is recorded in `version.json` and remains **0.0.4**;
 native Android, Android WebView and Windows/WinUI versions are independent.
 
 The host owns `/service-worker.js`, `/manifest.webmanifest`, and public `/pwa/`
@@ -31,7 +31,9 @@ and does not contain personal settings. Account preferences take precedence
 when the complete application reconnects, unless this browser explicitly selects
 device appearance. The selected public theme ID and digest-addressed stylesheet
 URL are cosmetic localStorage entries, allowing the neutral offline page to use
-an installed theme. They contain no account data. Removal retires the worker and
+an installed theme. A successfully loaded theme controls its colors without
+native palette overrides; if its CSS is unavailable offline, the retained
+personal palette remains usable. They contain no account data. Removal retires the worker and
 clears its owned HTML and theme caches, including in-flight asset writes.
 
 From the plugin repository run `python tools/sync_pwa.py --mobile-root PATH

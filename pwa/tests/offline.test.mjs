@@ -12,12 +12,12 @@ const appearance = { version: 1, theme: "system", palette: "custom", highContras
 
 function page({ saved, legacy, dark = false, denied = false, stylesheet, packageId } = {}) {
   const values = new Map(), reads = [], events = new Map(), retry = new Map();
-  const root = { dataset: {}, style: { setProperty: (key, value) => values.set(key, value) } };
+  const root = { dataset: {}, style: { setProperty: (key, value) => values.set(key, value), removeProperty: key => values.delete(key) } };
   const meta = {}, links = [];
   const system = { matches: dark, addEventListener: (name, callback) => events.set("system", callback) };
   let reloads = 0;
   const sandbox = { document: { documentElement: root, querySelector: () => meta, getElementById: () => ({ addEventListener: (name, callback) => retry.set(name, callback) }),
-    createElement: () => ({ addEventListener() {} }), head: { append: link => links.push(link) } },
+    createElement: () => ({ addEventListener: (name, callback) => events.set('stylesheet:'+name, callback) }), head: { append: link => links.push(link) } },
     matchMedia: () => system, localStorage: { getItem: key => { reads.push(key); if (denied) throw Error("denied"); return key === "ui-appearance" ? saved : key === "ui-theme-stylesheet" ? stylesheet : key === "ui-theme-package" ? packageId : legacy; } },
     getComputedStyle: () => ({ getPropertyValue: key => values.get(key) || (root.dataset.theme === "dark" ? "#17191c" : "#f5f4f1") }),
     window: { addEventListener: (name, callback) => events.set(name, callback) }, location: { reload: () => reloads++ } };
@@ -63,4 +63,28 @@ test("offline styling accepts only digest-addressed theme CSS on this host", () 
   for (const css of ["https://outside.test/theme.css", "javascript:alert(1)", stylesheet + "?anything=1", stylesheet.replace("theme.css", "../private.css")]) {
     assert.equal(page({ stylesheet: css, packageId: "official.forest" }).links.length, 0);
   }
+});
+
+test("a loaded installed theme takes precedence over native palette overrides", () => {
+  const stylesheet = `/api/themes/assets/official.forest/${"a".repeat(64)}/theme.css`;
+  const current = page({ saved: JSON.stringify(appearance), stylesheet, packageId: "official.forest" });
+  assert.equal(current.values.get("--ui-bg"), "#eeeeff");
+  current.events.get("stylesheet:load")();
+  assert.equal(current.values.size, 0);
+  assert.equal(current.root.dataset.themePackage, "official.forest");
+  current.system.matches = true;
+  current.events.get("system")();
+  assert.equal(current.values.size, 0);
+  assert.equal(current.root.dataset.theme, "dark");
+});
+
+test("a missing offline theme falls back to the retained personal palette", () => {
+  const stylesheet = `/api/themes/assets/official.forest/${"a".repeat(64)}/theme.css`;
+  const current = page({ saved: JSON.stringify(appearance), stylesheet, packageId: "official.forest" });
+  current.events.get("stylesheet:error")();
+  assert.equal(current.root.dataset.themePackage, "native");
+  assert.equal(current.meta.content, "#eeeeff");
+  current.system.matches = true;
+  current.events.get("system")();
+  assert.equal(current.meta.content, "#221133");
 });
